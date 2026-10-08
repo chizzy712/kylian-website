@@ -132,7 +132,7 @@ footer{text-align:center;color:var(--mu);font-size:13px;padding:40px 22px 50px;b
 <div class="card rv"><div class="stars">★★★★☆</div><p>"Great communication from start to finish. My site looks far more expensive than it was."</p><div class="rv-by">Sample Client<small>Sample review — replace with a real one</small></div></div>
 </div>
 <h3 style="margin-top:50px;font-size:28px">Leave a review</h3>
-<form id="rf"><input id="rn" placeholder="Your name" required><select id="rs"><option value="5">★★★★★ Excellent</option><option value="4">★★★★ Good</option><option value="3">★★★ Okay</option></select><textarea id="rt" rows="3" placeholder="Your experience" required></textarea><button class="btn b1" type="submit">Submit review</button><div id="rmsg"></div></form>
+<form id="rf"><input id="rn" placeholder="Your name" maxlength="60" required><select id="rs"><option value="5">★★★★★ Excellent</option><option value="4">★★★★ Good</option><option value="3">★★★ Okay</option></select><textarea id="rt" rows="3" maxlength="500" placeholder="Your experience" required></textarea><button class="btn b1" type="submit">Submit review</button><div id="rmsg"></div></form>
 </section>
 
 <section id="inquiry">
@@ -162,14 +162,25 @@ document.getElementById('mb').onclick=()=>nav.classList.toggle('open');
 document.querySelectorAll('nav a').forEach(a=>a.onclick=()=>nav.classList.remove('open'));
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 qf.onsubmit=e=>{e.preventDefault();const t=`Hello Kylian, I need a website.%0AName: ${encodeURIComponent(qn.value)}%0APhone: ${encodeURIComponent(qp.value)}%0AService: ${encodeURIComponent(qs.value)}%0ADetails: ${encodeURIComponent(qd.value)}`;msg.textContent='Opening WhatsApp…';location.href='https://wa.me/2347056007274?text='+t};
-(async()=>{let col=null,me=null;
-try{const db=await claude.use('db');const u=await claude.use('user');if(db){col=db.collection('reviews');me=u&&u.isOwner&&u.isOwner();
-col.onSnapshot(snap=>{const docs=snap.docs||[];const real=docs.map(d=>({id:d.id,...(typeof d.data==='function'?d.data():d)})).filter(r=>r.approved||me);
-if(!real.length)return;rlist.innerHTML=real.map(r=>`<div class="card on"><div class="stars">${'★'.repeat(r.stars||5)}</div><p>"${esc(r.text)}"</p><div class="rv-by">${esc(r.name)}${r.approved?'':'<small>Pending approval</small>'}</div>${me&&!r.approved?`<button class="btn b2" style="margin-top:12px;padding:8px 16px" data-ok="${r.id}">Approve</button>`:''}</div>`).join('');
-rlist.querySelectorAll('[data-ok]').forEach(b=>b.onclick=()=>col.doc(b.dataset.ok).update({approved:true}));},()=>{});}}catch(e){}
-rf.onsubmit=async e=>{e.preventDefault();const r={name:rn.value,stars:+rs.value,text:rt.value,approved:false,at:Date.now()};
-try{if(!col)throw 0;await col.add(r);rmsg.textContent='Thank you! Your review will appear once approved.';rf.reset()}
-catch(x){location.href='https://wa.me/2347056007274?text='+encodeURIComponent(`New review from ${r.name} (${r.stars}/5): ${r.text}`)}}})();
+
+const SB='https://qbtvxpqzwsbqmncdoxcn.supabase.co',KEY='sb_publishable_DYWhFnV0BiWrfaYXccWzeg_Mq4YQdja';
+const H={apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'};
+const samples=rlist.innerHTML;
+const BAD=['fuck','shit','bitch','bastard','asshole','dick','pussy','idiot','stupid','fool','mumu','yeye','ashawo','olosho','oloshi','ode','werey','scam','thief','fraud','419','useless','rubbish','trash','nonsense','hate','kill','die','dumb','moron','suck','http','www','.com','.ng','whatsapp'];
+function bad(t){const n=t.toLowerCase().replace(/[@4]/g,'a').replace(/[3]/g,'e').replace(/[1!|]/g,'i').replace(/0/g,'o').replace(/\$/g,'s');
+const words=n.replace(/[^a-z0-9. ]/g,' ').split(/\s+/);const flat=n.replace(/[^a-z0-9.]/g,'');
+return BAD.some(w=>w.length<=3&&w!=='419'?words.includes(w):flat.includes(w))}
+const card=(r,extra)=>`<div class="card on"><div class="stars">${'★'.repeat(r.stars)}${'☆'.repeat(5-r.stars)}</div><p>"${esc(r.text)}"</p><div class="rv-by">${esc(r.name)}${extra||''}</div></div>`;
+let saved=[];
+function draw(local){const mine=local?[local]:[];const all=mine.concat(saved);
+rlist.innerHTML=all.map(r=>card(r,r.local?'<small>Only you can see this</small>':'')).join('')+(saved.length<3?samples:'')}
+async function load(){try{const r=await fetch(SB+'/rest/v1/reviews?select=name,stars,text&order=created_at.desc&limit=30',{headers:H});if(r.ok){saved=await r.json();draw()}}catch(e){}}
+load();
+rf.onsubmit=async e=>{e.preventDefault();const r={name:rn.value.trim().slice(0,60),stars:+rs.value,text:rt.value.trim().slice(0,500)};
+if(bad(r.name+' '+r.text)){saved=saved.filter(x=>!x.local);draw({...r,local:true});rmsg.textContent='Thank you for your review!';rf.reset();return}
+try{const x=await fetch(SB+'/rest/v1/reviews',{method:'POST',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(r)});
+if(!x.ok)throw 0;saved.unshift(r);draw();rmsg.textContent='Thank you! Your review is now live.';rf.reset()}
+catch(err){rmsg.textContent='Sorry, could not save. Please try again.'}};
 </script>
 </body>
 </html>
